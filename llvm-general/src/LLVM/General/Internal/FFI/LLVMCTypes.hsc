@@ -9,9 +9,10 @@ import LLVM.General.Prelude
 
 #define __STDC_LIMIT_MACROS
 #include "llvm-c/Core.h"
+#include "llvm-c/Linker.h"
+#include "llvm-c/OrcBindings.h"
 #include "llvm-c/Target.h"
 #include "llvm-c/TargetMachine.h"
-#include "llvm-c/Linker.h"
 #include "LLVM/General/Internal/FFI/Attribute.h"
 #include "LLVM/General/Internal/FFI/Instruction.h" 
 #include "LLVM/General/Internal/FFI/Value.h"
@@ -23,8 +24,8 @@ import LLVM.General.Prelude
 #include "LLVM/General/Internal/FFI/Type.h"
 #include "LLVM/General/Internal/FFI/Constant.h"
 #include "LLVM/General/Internal/FFI/Analysis.h"
-#include "LLVM/General/Internal/FFI/Module.h"
 #include "LLVM/General/Internal/FFI/LibFunc.h"
+#include "LLVM/General/Internal/FFI/OrcJIT.h"
 
 import Language.Haskell.TH.Quote
 
@@ -117,6 +118,11 @@ newtype MemoryOrdering = MemoryOrdering CUInt
   deriving (Eq, Typeable, Data)
 #define MO_Rec(n) { #n, LLVMAtomicOrdering ## n },
 #{inject ATOMIC_ORDERING, MemoryOrdering, MemoryOrdering, memoryOrdering, MO_Rec}
+
+newtype UnnamedAddr = UnnamedAddr CUInt
+  deriving (Eq, Typeable, Data)
+#define UA_Rec(n) { #n, LLVMUnnamedAddr ## n },
+#{inject UNNAMED_ADDR, UnnamedAddr, UnnamedAddr, unnamedAddr, UA_Rec}
 
 newtype SynchronizationScope = SynchronizationScope CUInt
   deriving (Eq, Typeable, Data)
@@ -248,12 +254,12 @@ newtype VerifierFailureAction = VerifierFailureAction CUInt
 #define VFA_Rec(n) { #n, LLVM ## n ## Action },
 #{inject VERIFIER_FAILURE_ACTION, VerifierFailureAction, VerifierFailureAction, verifierFailureAction, VFA_Rec}
 
-newtype LinkerMode = LinkerMode CUInt
-  deriving (Eq, Read, Show, Bits, Typeable, Data, Num)
-#define LM_Rec(n) { #n, LLVMLinker ## n },
-#{inject LINKER_MODE, LinkerMode, LinkerMode, linkerMode, LM_Rec}
-
 newtype LibFunc = LibFunc CUInt
   deriving (Eq, Read, Show, Bits, Typeable, Data, Num, Storable)
 #define LF_Rec(n) { #n, LLVMLibFunc__ ## n },
 #{inject LIB_FUNC, LibFunc, LibFunc, libFunc__, LF_Rec}
+
+newtype JITSymbolFlags = JITSymbolFlags CUInt
+  deriving (Eq, Read, Show, Bits, Typeable, Data, Num, Storable)
+#define SF_Rec(n) { #n, LLVMJITSymbolFlag ## n },
+#{inject JIT_SYMBOL_FLAG, JITSymbolFlags, JITSymbolFlags, jitSymbolFlags, SF_Rec}

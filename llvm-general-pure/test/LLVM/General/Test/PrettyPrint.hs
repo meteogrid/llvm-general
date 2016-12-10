@@ -17,7 +17,7 @@ import qualified LLVM.General.AST.Constant as C
 
 tests = testGroup "PrettyPrint" [
   testCase "basic" $ do
-    let ast = Module "<string>" Nothing Nothing [
+    let ast = Module "<string>" "<string>" Nothing Nothing [
           GlobalDefinition $ functionDefaults {
             dllStorageClass = Just DLL.Export,
             returnType = i32,
@@ -44,6 +44,7 @@ tests = testGroup "PrettyPrint" [
          ]
         s = "A.Module {\n\
             \  A.moduleName = \"<string>\",\n\
+            \  A.moduleSourceFileName = \"<string>\",\n\
             \  A.moduleDataLayout = Nothing,\n\
             \  A.moduleTargetTriple = Nothing,\n\
             \  A.moduleDefinitions = [\n\
@@ -78,13 +79,14 @@ tests = testGroup "PrettyPrint" [
             \            A.metadata' = []\n\
             \          }\n\
             \        )\n\
-            \      ]\n\
+            \      ],\n\
+            \      A.G.personalityFunction = Nothing\n\
             \    }\n\
             \  ]\n\
             \}"
     showPretty ast @?= s,
   testCase "imports" $ do
-    imports defaultPrefixScheme @?= 
+    imports defaultPrefixScheme @?=
       "import Data.Either\n\
       \import qualified Data.Map as Map\n\
       \import Data.Maybe\n\
@@ -109,4 +111,4 @@ tests = testGroup "PrettyPrint" [
       \import qualified LLVM.General.AST.Type as A\n\
       \import qualified LLVM.General.AST.Visibility as A.V\n"
  ]
-  
+

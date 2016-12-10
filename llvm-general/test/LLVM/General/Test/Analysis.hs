@@ -69,15 +69,16 @@ tests = testGroup "Analysis" [
     testGroup "regression" [
       testCase "load synchronization" $ do
        let str = "; ModuleID = '<string>'\n\
+                 \source_filename = \"<string>\"\n\
                  \\n\
                  \define double @my_function2(double* %input_0) {\n\
                  \foo:\n\
-                 \  %tmp_input_w0 = getelementptr inbounds double* %input_0, i64 0\n\
-                 \  %0 = load double* %tmp_input_w0, align 8\n\
+                 \  %tmp_input_w0 = getelementptr inbounds double, double* %input_0, i64 0\n\
+                 \  %0 = load double, double* %tmp_input_w0, align 8\n\
                  \  ret double %0\n\
                  \}\n"
            ast = 
-             Module "<string>" Nothing Nothing [
+             Module "<string>" "<string>" Nothing Nothing [
                GlobalDefinition $ functionDefaults {
                  G.returnType = double,
                  G.name = Name "my_function2",

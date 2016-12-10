@@ -27,13 +27,14 @@ tests = testGroup "CallingConvention" [
      }
     ]
    }) ("; ModuleID = '<string>'\n\
+       \source_filename = \"<string>\"\n\
        \\n\
        \declare" ++ (if name == "" then "" else (" " ++ name)) ++ " i32 @foo()\n")
    | (name, cc) <- [
    ("", CC.C),
    ("fastcc", CC.Fast),
    ("coldcc", CC.Cold),
-   ("cc10", CC.GHC),
+   ("ghccc", CC.GHC),
    ("cc11", CC.HiPE),
    ("webkit_jscc", CC.WebKit_JS),
    ("anyregcc", CC.AnyReg),

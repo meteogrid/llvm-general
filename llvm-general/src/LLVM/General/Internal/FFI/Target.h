@@ -27,20 +27,14 @@
 
 #define LLVM_GENERAL_FOR_EACH_TARGET_OPTION_FLAG(macro)	\
 	macro(PrintMachineCode)																\
-	macro(NoFramePointerElim)															\
 	macro(LessPreciseFPMADOption)													\
 	macro(UnsafeFPMath)																		\
 	macro(NoInfsFPMath)																		\
 	macro(NoNaNsFPMath)																		\
 	macro(HonorSignDependentRoundingFPMathOption)					\
-	macro(UseSoftFloat)																		\
 	macro(NoZerosInBSS)																		\
-	macro(JITEmitDebugInfo)																\
-	macro(JITEmitDebugInfoToDisk)													\
 	macro(GuaranteedTailCallOpt)													\
-	macro(DisableTailCalls)																\
 	macro(EnableFastISel)																	\
-	macro(PositionIndependentExecutable)									\
 	macro(UseInitArray)																		\
 	macro(DisableIntegratedAS)														\
 	macro(CompressDebugSections)													\
@@ -55,7 +49,7 @@ typedef enum {
 #define LLVM_GENERAL_FOR_EACH_FLOAT_ABI(macro)	\
 	macro(Default)																\
 	macro(Soft)																		\
-	macro(Hard) 
+	macro(Hard)
 
 typedef enum {
 #define ENUM_CASE(n) LLVM_General_FloatABI_ ## n,

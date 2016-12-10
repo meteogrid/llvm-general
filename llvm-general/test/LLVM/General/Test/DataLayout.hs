@@ -17,12 +17,12 @@ import LLVM.General.AST.DataLayout
 import LLVM.General.AST.AddrSpace
 import qualified LLVM.General.AST.Global as G
 
-m s = "; ModuleID = '<string>'\n" ++ s
+m s = "; ModuleID = '<string>'\nsource_filename = \"<string>\"\n" ++ s
 t s = "target datalayout = \"" ++ s ++ "\"\n"
 ddl = defaultDataLayout BigEndian
 
 tests = testGroup "DataLayout" [
-  testCase name $ strCheckC (Module "<string>" mdl Nothing []) (m sdl) (m sdlc)
+  testCase name $ strCheckC (Module "<string>" "<string>" mdl Nothing []) (m sdl) (m sdlc)
   | (name, mdl, sdl, sdlc) <- [
    ("none", Nothing, "", "")
   ] ++ [
@@ -79,8 +79,8 @@ tests = testGroup "DataLayout" [
        aggregateLayout = AlignmentInfo {abiAlignment = 0, preferredAlignment = Just 256},
        nativeSizes = Just (Set.fromList [8,16,32,64])
      },
-     "e-m:e-p:8:8:16-i1:8:256-i8:8:256-i16:16:256-i32:32:256-i64:64:256-f32:32:256-f64:64:256-v64:64:256-v128:128:256-a:0:256-f80:128:256-n8:16:32:64-S128",
-     Just "e-m:e-p:8:8:16-i1:8:256-i8:8:256-i16:16:256-i32:32:256-i64:64:256-f32:32:256-f64:64:256-v64:64:256-v128:128:256-a:0:256-f80:128:256-n8:16:32:64-S128"
+     "e-m:e-p:8:8:16-i1:8:256-i8:8:256-i16:16:256-i32:32:256-i64:64:256-v64:64:256-v128:128:256-f32:32:256-f64:64:256-f80:128:256-a:0:256-n8:16:32:64-S128",
+     Nothing
     )
    ]
   ]

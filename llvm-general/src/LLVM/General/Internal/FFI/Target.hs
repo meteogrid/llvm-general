@@ -10,8 +10,10 @@ import Foreign.Ptr
 import Foreign.C
 
 import LLVM.General.Internal.FFI.LLVMCTypes
+import LLVM.General.Internal.FFI.MemoryBuffer
 import LLVM.General.Internal.FFI.Module
 import LLVM.General.Internal.FFI.RawOStream
+import LLVM.General.Internal.FFI.DataLayout
 
 data Target
 
@@ -38,12 +40,6 @@ foreign import ccall unsafe "LLVM_General_SetStackAlignmentOverride" setStackAli
 foreign import ccall unsafe "LLVM_General_GetStackAlignmentOverride" getStackAlignmentOverride ::
   Ptr TargetOptions -> IO CUInt
 
-foreign import ccall unsafe "LLVM_General_SetTrapFuncName" setTrapFuncName ::
-  Ptr TargetOptions -> CString -> IO ()
-
-foreign import ccall unsafe "LLVM_General_GetTrapFuncName" getTrapFuncName ::
-  Ptr TargetOptions -> IO CString
-
 foreign import ccall unsafe "LLVM_General_SetFloatABIType" setFloatABIType ::
   Ptr TargetOptions -> FloatABIType -> IO ()
 
@@ -61,9 +57,9 @@ foreign import ccall unsafe "LLVM_General_DisposeTargetOptions" disposeTargetOpt
 
 data TargetMachine
 
-foreign import ccall unsafe "LLVM_General_CreateTargetMachine" createTargetMachine ::
+foreign import ccall unsafe "LLVMCreateTargetMachine" createTargetMachine ::
   Ptr Target
-  -> CString 
+  -> CString
   -> CString
   -> CString
   -> Ptr TargetOptions
@@ -78,15 +74,34 @@ foreign import ccall unsafe "LLVMDisposeTargetMachine" disposeTargetMachine ::
 foreign import ccall unsafe "LLVM_General_TargetMachineEmit" targetMachineEmit ::
   Ptr TargetMachine
   -> Ptr Module
+  -> Ptr RawPWriteStream
   -> CodeGenFileType
   -> Ptr (OwnerTransfered CString)
-  -> Ptr RawOStream
+  -> IO LLVMBool
+
+foreign import ccall unsafe "LLVMTargetMachineEmitToFile" targetMachineEmitToFile ::
+  Ptr TargetMachine
+  -> Ptr Module
+  -> CString
+  -> CodeGenFileType
+  -> Ptr (OwnerTransfered CString)
+  -> IO LLVMBool
+
+foreign import ccall unsafe "LLVMTargetMachineEmitToMemoryBuffer" targetMachineEmitToMemoryBuffer ::
+  Ptr TargetMachine
+  -> Ptr Module
+  -> CodeGenFileType
+  -> Ptr (OwnerTransfered CString)
+  -> Ptr (Ptr MemoryBuffer)
   -> IO LLVMBool
 
 data TargetLowering
 
-foreign import ccall unsafe "LLVM_General_GetTargetLowering" getTargetLowering ::
-  Ptr TargetMachine -> IO (Ptr TargetLowering)
+-- foreign import ccall unsafe "LLVM_General_GetTargetLowering" getTargetLowering ::
+--   Ptr TargetMachine -> IO (Ptr TargetLowering)
+
+foreign import ccall unsafe "LLVMGetTargetMachineTriple" getTargetMachineTriple ::
+  Ptr TargetMachine -> IO (OwnerTransfered CString)
 
 foreign import ccall unsafe "LLVM_General_GetDefaultTargetTriple" getDefaultTargetTriple :: 
   IO (OwnerTransfered CString)
@@ -97,7 +112,7 @@ foreign import ccall unsafe "LLVM_General_GetProcessTargetTriple" getProcessTarg
 foreign import ccall unsafe "LLVM_General_GetHostCPUName" getHostCPUName :: 
   Ptr CSize -> IO CString
 
-foreign import ccall unsafe "LLVM_General_GetHostCPUFeatures" getHostCPUFeatures :: 
+foreign import ccall unsafe "LLVM_General_GetHostCPUFeatures" getHostCPUFeatures ::
   IO (OwnerTransfered CString)
 
 foreign import ccall unsafe "LLVM_General_GetTargetMachineDataLayout" getTargetMachineDataLayout ::
@@ -121,3 +136,6 @@ foreign import ccall unsafe "LLVM_General_DisposeTargetLibraryInfo" disposeTarge
   Ptr TargetLibraryInfo -> IO ()
 
 foreign import ccall unsafe "LLVM_General_InitializeAllTargets" initializeAllTargets :: IO ()
+
+foreign import ccall unsafe "LLVMCreateTargetDataLayout" createTargetDataLayout ::
+  Ptr TargetMachine -> IO (Ptr DataLayout)

@@ -38,6 +38,7 @@ import qualified LLVM.General.CodeModel as CM
 import qualified LLVM.General.CodeGenOpt as CGO
 
 handString = "; ModuleID = '<string>'\n\
+    \source_filename = \"<string>\"\n\
     \\n\
     \%0 = type { i32, %1*, %0* }\n\
     \%1 = type opaque\n\
@@ -45,16 +46,16 @@ handString = "; ModuleID = '<string>'\n\
     \$bob = comdat largest\n\
     \\n\
     \@0 = global i32 1\n\
-    \@1 = external protected addrspace(3) global i32, section \"foo\", comdat $bob\n\
+    \@1 = external protected addrspace(3) global i32, section \"foo\", comdat($bob)\n\
     \@2 = unnamed_addr global i8 2\n\
     \@3 = external dllimport global %0\n\
     \@4 = external global [4294967296 x i32]\n\
     \@.argyle = thread_local global i32 0\n\
     \@5 = thread_local(localdynamic) global i32 1\n\
     \\n\
-    \@three = alias private i32 addrspace(3)* @1\n\
-    \@two = unnamed_addr alias i32 addrspace(3)* @three\n\
-    \@one = thread_local(initialexec) alias i32* @5\n\
+    \@three = private alias i32, i32 addrspace(3)* @1\n\
+    \@two = unnamed_addr alias i32, i32 addrspace(3)* @three\n\
+    \@one = thread_local(initialexec) alias i32, i32* @5\n\
     \\n\
     \define i32 @bar() prefix i32 1 {\n\
     \  %1 = musttail call zeroext i32 @foo(i32 inreg align 16 1, i8 signext 4) #0\n\
@@ -81,7 +82,7 @@ handString = "; ModuleID = '<string>'\n\
     \\n\
     \attributes #0 = { nounwind readnone uwtable \"eep\" }\n"
 
-handAST = Module "<string>" Nothing Nothing [
+handAST = Module "<string>" "<string>" Nothing Nothing [
       TypeDefinition (UnName 0) (
          Just $ StructureType False [
            i32,
@@ -104,7 +105,7 @@ handAST = Module "<string>" Nothing Nothing [
       },
       GlobalDefinition $ globalVariableDefaults {
         G.name = UnName 2,
-        G.hasUnnamedAddr = True,
+        G.unnamedAddr = Just GlobalAddr,
         G.type' = i8,
         G.initializer = Just (C.Int 8 2)
       },
@@ -137,7 +138,7 @@ handAST = Module "<string>" Nothing Nothing [
       },
       GlobalDefinition $ globalAliasDefaults {
         G.name = Name "two",
-        G.hasUnnamedAddr = True,
+        G.unnamedAddr = Just GlobalAddr,
         G.type' = PointerType i32 (AddrSpace 3),
         G.aliasee = C.GlobalReference (PointerType i32 (AddrSpace 3)) (Name "three")
       },
@@ -264,14 +265,14 @@ tests = testGroup "Module" [
       a @?= "\t.text\n\
             \\t.file\t\"<string>\"\n\
             \\t.globl\tmain\n\
-            \\t.align\t16, 0x90\n\
+            \\t.p2align\t4, 0x90\n\
             \\t.type\tmain,@function\n\
             \main:\n\
             \\t.cfi_startproc\n\
             \\txorl\t%eax, %eax\n\
             \\tretq\n\
-            \.Ltmp0:\n\
-            \\t.size\tmain, .Ltmp0-main\n\
+            \.Lfunc_end0:\n\
+            \\t.size\tmain, .Lfunc_end0-main\n\
             \\t.cfi_endproc\n\
             \\n\
             \\n\
@@ -304,6 +305,7 @@ tests = testGroup "Module" [
   testGroup "regression" [
     testCase "minimal type info" $ withContext $ \context -> do
       let s = "; ModuleID = '<string>'\n\
+              \source_filename = \"<string>\"\n\
               \\n\
               \define void @trouble() {\n\
               \entry:\n\
@@ -317,7 +319,7 @@ tests = testGroup "Module" [
               \  %x1 = add i32 %x0, %x0\n\
               \  br label %dead0\n\
               \}\n"
-          ast = Module "<string>" Nothing Nothing [
+          ast = Module "<string>" "<string>" Nothing Nothing [
              GlobalDefinition $ functionDefaults {
                 G.returnType = T.void,
                 G.name = Name "trouble",
@@ -357,11 +359,12 @@ tests = testGroup "Module" [
 
     testCase "metadata type" $ withContext $ \context -> do
       let s = "; ModuleID = '<string>'\n\
+              \source_filename = \"<string>\"\n\
               \\n\
               \define void @bar(metadata) {\n\
               \  ret void\n\
               \}\n"
-          ast = Module "<string>" Nothing Nothing [
+          ast = Module "<string>" "<string>" Nothing Nothing [
              GlobalDefinition $ functionDefaults {
                G.returnType = void,
                G.name = Name "bar",
@@ -374,7 +377,7 @@ tests = testGroup "Module" [
       strCheck ast s,
 
     testCase "set flag on constant expr" $ withContext $ \context -> do
-      let ast = Module "<string>" Nothing Nothing [
+      let ast = Module "<string>" "<string>" Nothing Nothing [
              GlobalDefinition $ functionDefaults {
                G.returnType = i32,
                G.name = Name "foo",
@@ -402,7 +405,7 @@ tests = testGroup "Module" [
       t @?= True,
 
     testCase "Phi node finishes" $ withContext $ \context -> do
-      let ast = Module "<string>" Nothing Nothing [
+      let ast = Module "<string>" "<string>" Nothing Nothing [
             GlobalDefinition $ functionDefaults {
               G.returnType = i32,
               G.name = Name "foo",
@@ -436,6 +439,7 @@ tests = testGroup "Module" [
              }
            ]
           s = "; ModuleID = '<string>'\n\
+              \source_filename = \"<string>\"\n\
               \\n\
               \define i32 @foo(i32 %x) {\n\
               \  %1 = mul nsw i32 %x, %x\n\
@@ -461,7 +465,7 @@ tests = testGroup "Module" [
             cbps = zip [ C.Int 32 i | i <- [0..] ] [ UnName n | n <- ns ]
 
         withContext $ \context -> do
-          let ast = Module "<string>" Nothing Nothing [
+          let ast = Module "<string>" "<string>" Nothing Nothing [
                 GlobalDefinition $ functionDefaults {
                   G.name = Name "foo",
                   G.returnType = i32,
@@ -485,11 +489,12 @@ tests = testGroup "Module" [
 
       testCase "struct constant" $ do
         let s = "; ModuleID = '<string>'\n\
+                \source_filename = \"<string>\"\n\
                 \\n\
                 \%0 = type { i32 }\n\
                 \\n\
                 \@0 = constant %0 { i32 1 }, align 4\n"
-            ast = Module "<string>" Nothing Nothing [
+            ast = Module "<string>" "<string>" Nothing Nothing [
               TypeDefinition (UnName 0) (Just $ StructureType False [i32]),
               GlobalDefinition $ globalVariableDefaults {
                 G.name = UnName 0,
@@ -504,7 +509,7 @@ tests = testGroup "Module" [
         
   testGroup "failures" [
     testCase "bad block reference" $ withContext $ \context -> do
-      let badAST = Module "<string>" Nothing Nothing [
+      let badAST = Module "<string>" "<string>" Nothing Nothing [
             GlobalDefinition $ functionDefaults {
               G.returnType = i32,
               G.name = Name "foo",
@@ -532,7 +537,7 @@ tests = testGroup "Module" [
       t @?= Left "reference to undefined block: Name \"not here\"",
 
     testCase "multiple" $ withContext $ \context -> do
-      let badAST = Module "<string>" Nothing Nothing [
+      let badAST = Module "<string>" "<string>" Nothing Nothing [
             GlobalDefinition $ functionDefaults {
               G.returnType = i32,
               G.name = Name "foo",
@@ -559,6 +564,12 @@ tests = testGroup "Module" [
              }
            ]
       t <- runExceptT $ withModuleFromAST context badAST $ \_ -> return True
-      t @?= Left "reference to undefined local: Name \"unknown\""
+      t @?= Left "reference to undefined local: Name \"unknown\"",
+
+    testCase "sourceFileName" $ withContext $ \context -> do
+      let s = "; ModuleID = '<string>'\n\
+              \source_filename = \"filename\"\n"
+          ast = Module "<string>" "filename" Nothing Nothing []
+      strCheck ast s
    ]
  ]

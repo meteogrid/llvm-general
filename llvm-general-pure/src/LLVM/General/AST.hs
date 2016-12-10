@@ -8,6 +8,7 @@ module LLVM.General.AST (
         globalVariableDefaults,
         globalAliasDefaults,
         functionDefaults,
+  UnnamedAddr(..),
   Parameter(..),
   BasicBlock(..),
   module LLVM.General.AST.Instruction,
@@ -31,7 +32,7 @@ import qualified LLVM.General.AST.COMDAT as COMDAT
 data Definition 
   = GlobalDefinition Global
   | TypeDefinition Name (Maybe Type)
-  | MetadataNodeDefinition MetadataNodeID [Maybe Operand]
+  | MetadataNodeDefinition MetadataNodeID [Maybe Metadata]
   | NamedMetadataDefinition String [MetadataNodeID]
   | ModuleInlineAssembly String
   | FunctionAttributes A.GroupID [A.FunctionAttribute]
@@ -42,6 +43,7 @@ data Definition
 data Module = 
   Module {
     moduleName :: String,
+    moduleSourceFileName :: String,
     -- | a 'DataLayout', if specified, must match that of the eventual code generator
     moduleDataLayout :: Maybe DataLayout, 
     moduleTargetTriple :: Maybe String,
@@ -53,6 +55,7 @@ data Module =
 defaultModule = 
   Module {
     moduleName = "<string>",
+    moduleSourceFileName = "<string>",
     moduleDataLayout = Nothing,
     moduleTargetTriple = Nothing,
     moduleDefinitions = []

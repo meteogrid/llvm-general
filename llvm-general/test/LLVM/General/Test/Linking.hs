@@ -33,7 +33,7 @@ import qualified LLVM.General.AST.Constant as C
 tests = testGroup "Linking" [
   testCase "basic" $ do
     let 
-      ast0 = Module "<string>" Nothing Nothing [
+      ast0 = Module "<string>" "<string>" Nothing Nothing [
           GlobalDefinition $ functionDefaults {
              G.linkage = L.Private,
              G.returnType = i32,
@@ -45,7 +45,7 @@ tests = testGroup "Linking" [
              G.name = Name "external0"
            }
         ]
-      ast1 = Module "<string>" Nothing Nothing [
+      ast1 = Module "<string>" "<string>" Nothing Nothing [
           GlobalDefinition $ functionDefaults {
              G.linkage = L.Private,
              G.returnType = i32,
@@ -59,9 +59,9 @@ tests = testGroup "Linking" [
         ]      
 
     Module { moduleDefinitions = defs } <- withContext $ \context -> 
-      withModuleFromAST' context ast0 $ \m0 ->
-        withModuleFromAST' context ast1 $ \m1 -> do
-          runExceptT $ linkModules False m0 m1
-          moduleAST m0
-    [ n | GlobalDefinition g <- defs, let Name n = G.name g ] @?= [ "private0", "external0", "external1" ]
+      withModuleFromAST' context ast0 $ \dest -> do
+      withModuleFromAST' context ast0 $ \src -> do
+        failInIO $ linkModules dest src
+        moduleAST dest
+    [ n | GlobalDefinition g <- defs, let Name n = G.name g ] @?= [ "private0", "external0" ]
  ]

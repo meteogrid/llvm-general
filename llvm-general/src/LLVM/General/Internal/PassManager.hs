@@ -1,6 +1,7 @@
 {-# LANGUAGE
   TemplateHaskell,
-  MultiParamTypeClasses
+  MultiParamTypeClasses,
+  CPP
   #-}
 module LLVM.General.Internal.PassManager where
 
@@ -22,7 +23,6 @@ import qualified LLVM.General.Internal.FFI.Transforms as FFI
 import LLVM.General.Internal.Module
 import LLVM.General.Internal.Target
 import LLVM.General.Internal.Coding
-import LLVM.General.Internal.DataLayout
 import LLVM.General.Transforms
 
 import LLVM.General.AST.DataLayout
@@ -88,7 +88,6 @@ instance (Monad m, MonadAnyCont IO m) => EncodeM m GCOVVersion CString where
 createPassManager :: PassSetSpec -> IO (Ptr FFI.PassManager)
 createPassManager pss = flip runAnyContT return $ do
   pm <- liftIO $ FFI.createPassManager
-  forM_ (dataLayout pss) $ \dl -> liftIO $ withFFIDataLayout dl $ FFI.addDataLayoutPass pm 
   forM_ (targetLibraryInfo pss) $ \(TargetLibraryInfo tli) -> do
     liftIO $ FFI.addTargetLibraryInfoPass pm tli
   forM_ (targetMachine pss) $ \(TargetMachine tm) -> liftIO $ FFI.addAnalysisPasses tm pm
@@ -108,7 +107,11 @@ createPassManager pss = flip runAnyContT return $ do
       let tm = maybe nullPtr (\(TargetMachine tm) -> tm) tm'
       forM_ ps $ \p -> $(
         do
+#if __GLASGOW_HASKELL__ < 800
           TH.TyConI (TH.DataD _ _ _ cons _) <- TH.reify ''Pass
+#else
+          TH.TyConI (TH.DataD _ _ _ _ cons _) <- TH.reify ''Pass
+#endif
           TH.caseE [| p |] $ flip map cons $ \con -> do
             let
               (n, fns) = case con of
@@ -137,4 +140,6 @@ withPassManager s = bracket (createPassManager s) FFI.disposePassManager . (. Pa
 
 -- | run the passes in a 'PassManager' on a 'Module', modifying the 'Module'.
 runPassManager :: PassManager -> Module -> IO Bool
-runPassManager (PassManager p) (Module m) = toEnum . fromIntegral <$> FFI.runPassManager p m
+runPassManager (PassManager p) m = do
+  m' <- readModule m
+  toEnum . fromIntegral <$> FFI.runPassManager p m'

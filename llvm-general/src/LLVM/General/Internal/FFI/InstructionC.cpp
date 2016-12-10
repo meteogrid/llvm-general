@@ -10,6 +10,7 @@
 
 #include "llvm-c/Core.h"
 
+#include "LLVM/General/Internal/FFI/Metadata.hpp"
 #include "LLVM/General/Internal/FFI/AttributeC.hpp"
 #include "LLVM/General/Internal/FFI/Instruction.h"
 #include "LLVM/General/Internal/FFI/CallingConventionC.hpp"
@@ -20,7 +21,7 @@ namespace llvm {
 
 static LLVMAtomicOrdering wrap(AtomicOrdering l) {
 	switch(l) {
-#define ENUM_CASE(x) case x: return LLVMAtomicOrdering ## x;
+#define ENUM_CASE(x) case AtomicOrdering::x: return LLVMAtomicOrdering ## x;
 LLVM_GENERAL_FOR_EACH_ATOMIC_ORDERING(ENUM_CASE)
 #undef ENUM_CASE
 	default: return LLVMAtomicOrdering(0);
@@ -236,6 +237,14 @@ LLVMBool LLVM_General_IsCleanup(LLVMValueRef v) {
 	return unwrap<LandingPadInst>(v)->isCleanup();
 }
 
+unsigned LLVM_General_GetNumClauses(LLVMValueRef v) {
+    return unwrap<LandingPadInst>(v)->getNumClauses();
+}
+
+LLVMValueRef LLVM_General_GetClause(LLVMValueRef v, unsigned i) {
+    return wrap(unwrap<LandingPadInst>(v)->getClause(i));
+}
+
 void LLVM_General_GetSwitchCases(
 	LLVMValueRef v,
 	LLVMValueRef *values,
@@ -257,10 +266,19 @@ void LLVM_General_GetIndirectBrDests(
 		*dests = wrap(ib->getDestination(i));
 }
 
+inline Metadata **unwrap(LLVMMetadataRef *vals) {
+    return reinterpret_cast<Metadata**>(vals);
+}
+
+void LLVM_General_SetMetadata(LLVMValueRef inst, unsigned kindID, LLVMMetadataRef md) {
+    MDNode *N = md ? unwrap<MDNode>(md) : nullptr;
+    unwrap<Instruction>(inst)->setMetadata(kindID, N);
+}
+
 unsigned LLVM_General_GetMetadata(
 	LLVMValueRef i,
 	unsigned *kinds,
-	LLVMValueRef *nodes,
+	LLVMMetadataRef *nodes,
 	unsigned nKinds
 ) {
 	SmallVector<std::pair<unsigned, MDNode *>, 4> mds;

@@ -1,6 +1,7 @@
 {-# LANGUAGE
   TemplateHaskell,
-  ForeignFunctionInterface
+  ForeignFunctionInterface,
+  CPP
   #-}
 
 module LLVM.General.Internal.FFI.PassManager where
@@ -45,12 +46,7 @@ foreign import ccall unsafe "LLVMRunFunctionPassManager" runFunctionPassManager 
 foreign import ccall unsafe "LLVMFinalizeFunctionPassManager" finalizeFunctionPassManager ::
   Ptr PassManager -> IO CUInt
 
-foreign import ccall unsafe "LLVMAddTargetData" addDataLayoutPass' ::
-  Ptr DataLayout -> Ptr PassManager -> IO ()
-
-addDataLayoutPass = flip addDataLayoutPass'
-
-foreign import ccall unsafe "LLVM_General_LLVMAddAnalysisPasses" addAnalysisPasses ::
+foreign import ccall unsafe "LLVMAddAnalysisPasses" addAnalysisPasses ::
   Ptr TargetMachine -> Ptr PassManager -> IO ()
 
 foreign import ccall unsafe "LLVMAddTargetLibraryInfo" addTargetLibraryInfoPass' ::
@@ -82,8 +78,11 @@ $(do
            ++ [[t| Ptr TargetMachine |] | needsTargetMachine n]
            ++ map passTypeMapping extraParams)
           (TH.tupleT 0)
-
+#if __GLASGOW_HASKELL__ < 800
   TH.TyConI (TH.DataD _ _ _ cons _) <- TH.reify ''G.Pass
+#else
+  TH.TyConI (TH.DataD _ _ _ _ cons _) <- TH.reify ''G.Pass
+#endif
   liftM concat $ forM cons $ \con -> case con of
     TH.RecC n l -> declareForeign n [ t | (_,_,t) <- l ]
     TH.NormalC n [] -> declareForeign n []

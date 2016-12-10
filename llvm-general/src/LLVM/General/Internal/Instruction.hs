@@ -14,8 +14,9 @@ import qualified Language.Haskell.TH.Quote as TH
 import qualified LLVM.General.Internal.InstructionDefs as ID
 import LLVM.General.Internal.InstructionDefs (instrP)
 
-import Control.Monad.Exceptable
 import Control.Monad.AnyCont
+import Control.Monad.Error.Class
+import Control.Monad.IO.Class
 import Control.Monad.State (gets)
 
 import Foreign.Ptr
@@ -263,7 +264,6 @@ $(do
                 "vector" -> ([], [| op 0 |])
                 "element" -> ([], [| op 1 |])
                 "index" -> ([], case lrn of "ExtractElement" -> [| op 1 |]; "InsertElement" -> [| op 2 |])
-                "personalityFunction" -> ([], [| op 0 |])
                 "mask" -> ([], [| cop 2 |])
                 "aggregate" -> ([], [| op 0 |])
                 "metadata" -> ([], [| meta i |])
@@ -280,9 +280,11 @@ $(do
                                          p <- op (j-1)
                                          return (p, pAttrs) |])
                 "clauses" -> 
-                  ([], [| forM [1..nOps-1] $ \j -> do
-                          v <- liftIO $ FFI.getOperand (FFI.upCast i) j
-                          c <- decodeM =<< (liftIO $ FFI.isAConstant v)
+                  ([], [|do
+                          nClauses <- liftIO $ FFI.getNumClauses i
+                          forM [0..nClauses-1] $ \j -> do
+                          v <- liftIO $ FFI.getClause i j
+                          c <- decodeM v
                           t <- typeOf v
                           return $ case t of { A.ArrayType _ _ -> A.Filter; _ -> A.Catch} $ c |])
                 "functionAttributes" -> (["attrs"], [| return $ functionAttributes $(TH.dyn "attrs") |])
@@ -439,13 +441,11 @@ $(do
             return' i
           A.LandingPad { 
             A.type' = t,
-            A.personalityFunction = pf,
             A.cleanup = cl, 
             A.clauses = cs
           } -> do
             t' <- encodeM t
-            pf' <- encodeM pf
-            i <- liftIO $ FFI.buildLandingPad builder t' pf' (fromIntegral $ length cs) s
+            i <- liftIO $ FFI.buildLandingPad builder t' (fromIntegral $ length cs) s
             forM cs $ \c -> 
               case c of
                 A.Catch a -> do

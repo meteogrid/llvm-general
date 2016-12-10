@@ -2,9 +2,12 @@ module LLVM.General.Internal.RawOStream where
 
 import LLVM.General.Prelude
 
-import Control.Monad.Exceptable
 import Control.Monad.AnyCont
+import Control.Monad.Error.Class
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Except
 
+import Unsafe.Coerce
 import Data.IORef
 import Foreign.C
 import Foreign.Ptr
@@ -29,13 +32,21 @@ withFileRawOStream path excl text c = do
   msgPtr <- alloca
   errorRef <- liftIO $ newIORef undefined
   succeeded <- decodeM =<< (liftIO $ FFI.withFileRawOStream path excl text msgPtr $ \os -> do
-                              r <- runExceptableT (ExceptableT  $ c os)
+                              r <- runExceptT (c os)
                               writeIORef errorRef r)
   unless succeeded $ do
     s <- decodeM msgPtr
     throwError $ inject (s :: String)
   e <- liftIO $ readIORef errorRef
   either (throwError . inject) return e
+
+withFileRawPWriteStream ::  (Inject String e, MonadError e m, MonadAnyCont IO m, MonadIO m)
+                            => String
+                            -> Bool
+                            -> Bool
+                            -> (Ptr FFI.RawPWriteStream -> ExceptT String IO ())
+                            -> m ()
+withFileRawPWriteStream path excl text c = withFileRawOStream path excl text (unsafeCoerce c)
 
 withBufferRawOStream ::
   (Inject String e, MonadError e m, MonadIO m, DecodeM IO a (Ptr CChar, CSize))
@@ -49,7 +60,7 @@ withBufferRawOStream c = do
         r <- decodeM (start, size)
         writeIORef resultRef (Just r)
       saveError os = do
-        r <- runExceptableT (ExceptableT $ c os)
+        r <- runExceptT (c os)
         writeIORef errorRef r
   liftIO $ FFI.withBufferRawOStream saveBuffer saveError
   e <- liftIO $ readIORef errorRef
@@ -58,3 +69,10 @@ withBufferRawOStream c = do
     _ -> do
       Just r <- liftIO $ readIORef resultRef
       return r
+
+withBufferRawPWriteStream ::
+  (Inject String e, MonadError e m, MonadIO m, DecodeM IO a (Ptr CChar, CSize))
+  => (Ptr FFI.RawPWriteStream -> ExceptT String IO ())
+  -> m a
+withBufferRawPWriteStream c = do
+  withBufferRawOStream (unsafeCoerce c)

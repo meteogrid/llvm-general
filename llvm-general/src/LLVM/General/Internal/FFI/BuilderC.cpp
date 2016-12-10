@@ -12,7 +12,7 @@ using namespace llvm;
 namespace llvm {
 static AtomicOrdering unwrap(LLVMAtomicOrdering l) {
 	switch(l) {
-#define ENUM_CASE(x) case LLVMAtomicOrdering ## x: return x;
+#define ENUM_CASE(x) case LLVMAtomicOrdering ## x: return AtomicOrdering::x;
 LLVM_GENERAL_FOR_EACH_ATOMIC_ORDERING(ENUM_CASE)
 #undef ENUM_CASE
 	default: return AtomicOrdering(0);
@@ -78,7 +78,7 @@ LLVM_GENERAL_FOR_EACH_POSSIBLY_EXACT_BINARY_OPERATOR(ENUM_CASE)
 #undef ENUM_CASE
 
 void LLVM_General_SetFastMathFlags(LLVMBuilderRef b, LLVMFastMathFlags f) {
-	unwrap(b)->SetFastMathFlags(unwrap(f));
+	unwrap(b)->setFastMathFlags(unwrap(f));
 }
 
 LLVMValueRef LLVM_General_BuildLoad(
@@ -178,5 +178,8 @@ LLVMValueRef LLVM_General_BuildInsertValue(
 ) {
 	return wrap(unwrap(b)->CreateInsertValue(unwrap(a), unwrap(v), ArrayRef<unsigned>(idxs, n), name));
 }
+
+//     LLVMValueRef LLVM_General_BuildCleanupPad(LLVMBuilderRef b, LLVM) {
+// }
 
 }

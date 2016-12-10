@@ -1,8 +1,9 @@
 {-# LANGUAGE FlexibleInstances #-}
 import Control.Exception (SomeException, try)
 import Control.Monad
+import Data.Functor
 import Data.Maybe
-import Data.List (isPrefixOf, (\\), intercalate, stripPrefix)
+import Data.List (isPrefixOf, (\\), intercalate, stripPrefix, find)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Monoid
@@ -15,7 +16,6 @@ import Distribution.Simple.LocalBuildInfo
 import Distribution.PackageDescription
 import Distribution.Version
 import System.Environment
-import System.SetEnv
 import Distribution.System
 
 -- define these selectively in C files (where _not_ using HsFFI.h),
@@ -23,7 +23,7 @@ import Distribution.System
 -- without checking they're already defined and so causes warnings.
 uncheckedHsFFIDefines = ["__STDC_LIMIT_MACROS"]
 
-llvmVersion = Version [3,5] []
+llvmVersion = Version [3,9] []
 
 llvmConfigNames = [
   "llvm-config-" ++ (intercalate "." . map show . versionBranch $ llvmVersion),
@@ -98,7 +98,16 @@ addLLVMToLdLibraryPath configFlags = do
   llvmConfig <- getLLVMConfig configFlags
   [libDir] <- liftM lines $ llvmConfig "--libdir"
   addToLdLibraryPath libDir
-                           
+
+-- | These flags are not relevant for us and dropping them allows
+-- linking against LLVM build with Clang using GCC
+ignoredCxxFlags :: [String]
+ignoredCxxFlags =
+  ["-Wcovered-switch-default", "-fcolor-diagnostics"] ++ map ("-D" ++) uncheckedHsFFIDefines
+
+ignoredCFlags :: [String]
+ignoredCFlags = ["-Wcovered-switch-default", "-Wdelete-non-virtual-dtor", "-fcolor-diagnostics"]
+
 main = do
   let origUserHooks = simpleUserHooks
                   
@@ -107,10 +116,13 @@ main = do
 
     confHook = \(genericPackageDescription, hookedBuildInfo) configFlags -> do
       llvmConfig <- getLLVMConfig configFlags
-
-      llvmCppFlags <- do
-        l <- llvmConfig "--cppflags"
-        return $ (filter ("-D" `isPrefixOf`) $ words l) \\ (map ("-D"++) uncheckedHsFFIDefines)
+      llvmCxxFlags <- do
+        rawLlvmCxxFlags <- llvmConfig "--cxxflags"
+        return (words rawLlvmCxxFlags \\ ignoredCxxFlags)
+      let stdLib = maybe "stdc++"
+                         (drop (length stdlibPrefix))
+                         (find (isPrefixOf stdlibPrefix) llvmCxxFlags)
+            where stdlibPrefix = "-stdlib=lib"
       includeDirs <- liftM lines $ llvmConfig "--includedir"
       libDirs@[libDir] <- liftM lines $ llvmConfig "--libdir"
       [llvmVersion] <- liftM lines $ llvmConfig "--version"
@@ -125,7 +137,11 @@ main = do
               libraryCondTree <- condLibrary genericPackageDescription
               return libraryCondTree {
                 condTreeData = condTreeData libraryCondTree <> mempty {
-                    libBuildInfo = mempty { ccOptions = llvmCppFlags }
+                    libBuildInfo =
+                      mempty {
+                        ccOptions = llvmCxxFlags,
+                        extraLibs = [stdLib]
+                      }
                   },
                 condTreeComponents = condTreeComponents libraryCondTree ++ [
                   (
@@ -146,8 +162,17 @@ main = do
     hookedPreProcessors =
       let origHookedPreprocessors = hookedPreProcessors origUserHooks
           newHsc buildInfo localBuildInfo =
-            maybe ppHsc2hs id (lookup "hsc" origHookedPreprocessors) buildInfo' localBuildInfo
-              where buildInfo' = buildInfo { ccOptions = ccOptions buildInfo \\ ["-std=c++11"] }
+              PreProcessor {
+                  platformIndependent = platformIndependent (origHsc buildInfo localBuildInfo),
+                  runPreProcessor = \inFiles outFiles verbosity -> do
+                      llvmConfig <- getLLVMConfig (configFlags localBuildInfo)
+                      llvmCFlags <- do
+                          rawLlvmCFlags <- llvmConfig "--cflags"
+                          return (words rawLlvmCFlags \\ ignoredCFlags)
+                      let buildInfo' = buildInfo { ccOptions = llvmCFlags }
+                      runPreProcessor (origHsc buildInfo' localBuildInfo) inFiles outFiles verbosity
+              }
+              where origHsc = fromMaybe ppHsc2hs (lookup "hsc" origHookedPreprocessors)
       in [("hsc", newHsc)] ++ origHookedPreprocessors,
 
     buildHook = \packageDescription localBuildInfo userHooks buildFlags -> do

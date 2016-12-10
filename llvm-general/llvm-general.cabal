@@ -1,5 +1,5 @@
 name: llvm-general
-version: 3.5.0.0
+version: 3.9.0.0
 license: BSD3
 license-file: LICENSE
 author: Benjamin S.Scarlet <fgthb0@greynode.net>
@@ -29,15 +29,22 @@ extra-source-files:
   src/LLVM/General/Internal/FFI/InlineAssembly.h
   src/LLVM/General/Internal/FFI/Instruction.h
   src/LLVM/General/Internal/FFI/LibFunc.h
-  src/LLVM/General/Internal/FFI/Module.h
+  src/LLVM/General/Internal/FFI/OrcJIT.h
   src/LLVM/General/Internal/FFI/SMDiagnostic.h
   src/LLVM/General/Internal/FFI/Target.h
   src/LLVM/General/Internal/FFI/Type.h
   src/LLVM/General/Internal/FFI/Value.h
+tested-with: GHC == 7.8.4, GHC == 7.10.3, GHC == 8.0.1
 
 source-repository head
   type: git
   location: git://github.com/bscarlet/llvm-general.git
+
+source-repository this
+  type: git
+  location: git://github.com/bscarlet/llvm-general.git
+  branch: llvm-3.9
+  tag: v3.9.0.0
 
 flag shared-llvm
   description: link against llvm shared rather than static library
@@ -47,24 +54,26 @@ flag debug
   description: compile C(++) shims with debug info for ease of troubleshooting
   default: False
 
+custom-setup
+  setup-depends: base
+               , Cabal
+               , containers
+
 library
   build-tools: llvm-config
   ghc-options: -fwarn-unused-imports
-  cc-options: -std=c++11
   build-depends:
-    base >= 4.6 && < 5,
+    base >= 4.7 && < 5,
     utf8-string >= 0.3.7,
     bytestring >= 0.9.1.10,
-    transformers >= 0.3.0.0 && < 0.5,
-    transformers-compat,
+    transformers >= 0.3 && < 0.6,
+    transformers-compat >= 0.4,
     mtl >= 2.1.3,
     template-haskell >= 2.5.0.0,
     containers >= 0.4.2.1,
     parsec >= 3.1.3,
     array >= 0.4.0.0,
-    setenv >= 0.1.0,
-    llvm-general-pure == 3.5.0.0
-  extra-libraries: stdc++
+    llvm-general-pure == 3.9.0.0
   hs-source-dirs: src
   extensions:
     NoImplicitPrelude
@@ -85,6 +94,9 @@ library
     LLVM.General.Diagnostic
     LLVM.General.ExecutionEngine
     LLVM.General.Module
+    LLVM.General.OrcJIT
+    LLVM.General.OrcJIT.CompileOnDemandLayer
+    LLVM.General.OrcJIT.IRCompileLayer
     LLVM.General.PassManager
     LLVM.General.Relocation
     LLVM.General.Target
@@ -95,7 +107,6 @@ library
 
   other-modules:
     Control.Monad.AnyCont
-    Control.Monad.Exceptable
     Control.Monad.AnyCont.Class
     Control.Monad.Trans.AnyCont
     LLVM.General.Internal.Analysis
@@ -125,6 +136,9 @@ library
     LLVM.General.Internal.MemoryBuffer
     LLVM.General.Internal.Metadata
     LLVM.General.Internal.Module
+    LLVM.General.Internal.OrcJIT
+    LLVM.General.Internal.OrcJIT.CompileOnDemandLayer
+    LLVM.General.Internal.OrcJIT.IRCompileLayer
     LLVM.General.Internal.Operand
     LLVM.General.Internal.PassManager
     LLVM.General.Internal.RawOStream
@@ -161,6 +175,9 @@ library
     LLVM.General.Internal.FFI.MemoryBuffer
     LLVM.General.Internal.FFI.Metadata
     LLVM.General.Internal.FFI.Module
+    LLVM.General.Internal.FFI.OrcJIT
+    LLVM.General.Internal.FFI.OrcJIT.CompileOnDemandLayer
+    LLVM.General.Internal.FFI.OrcJIT.IRCompileLayer
     LLVM.General.Internal.FFI.PassManager
     LLVM.General.Internal.FFI.PtrHierarchy
     LLVM.General.Internal.FFI.RawOStream
@@ -188,6 +205,7 @@ library
     src/LLVM/General/Internal/FFI/InstructionC.cpp
     src/LLVM/General/Internal/FFI/MetadataC.cpp
     src/LLVM/General/Internal/FFI/ModuleC.cpp
+    src/LLVM/General/Internal/FFI/OrcJITC.cpp
     src/LLVM/General/Internal/FFI/RawOStreamC.cpp
     src/LLVM/General/Internal/FFI/PassManagerC.cpp
     src/LLVM/General/Internal/FFI/SMDiagnosticC.cpp
@@ -201,14 +219,14 @@ library
 test-suite test
   type: exitcode-stdio-1.0
   build-depends:
-    base >= 4.6 && < 5,
+    base >= 4.7 && < 5,
     test-framework >= 0.5,
     test-framework-hunit >= 0.2.7,
     HUnit >= 1.2.4.2,
     test-framework-quickcheck2 >= 0.3.0.1,
     QuickCheck >= 2.5.1.1,
-    llvm-general == 3.5.0.0,
-    llvm-general-pure == 3.5.0.0,
+    llvm-general == 3.9.0.0,
+    llvm-general-pure == 3.9.0.0,
     containers >= 0.4.2.1,
     mtl >= 2.1,
     transformers >= 0.3.0.0,
@@ -232,6 +250,7 @@ test-suite test
     LLVM.General.Test.Linking
     LLVM.General.Test.Metadata
     LLVM.General.Test.Module
+    LLVM.General.Test.OrcJIT
     LLVM.General.Test.Optimization
     LLVM.General.Test.Support
     LLVM.General.Test.Target

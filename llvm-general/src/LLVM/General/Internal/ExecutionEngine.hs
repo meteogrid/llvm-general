@@ -10,7 +10,7 @@ import LLVM.General.Prelude
 import Control.Exception
 import Control.Monad.IO.Class
 import Control.Monad.AnyCont
-import Control.Monad.Exceptable
+import Control.Monad.Trans.Except
 
 import Data.IORef
 import Foreign.Ptr
@@ -46,7 +46,9 @@ class ExecutionEngine e f | e -> f where
   getFunction :: ExecutableModule e -> A.Name -> IO (Maybe f)
 
 instance ExecutionEngine (Ptr FFI.ExecutionEngine) (FunPtr ()) where
-  withModuleInEngine e (Module m) = bracket_ (FFI.addModule e m) (removeModule e m) . ($ (ExecutableModule e m)) 
+  withModuleInEngine e m f = do
+    m' <- readModule m
+    bracket_ (FFI.addModule e m') (removeModule e m') (f (ExecutableModule e m'))
   getFunction (ExecutableModule e m) (A.Name name) = flip runAnyContT return $ do
     name <- encodeM name
     f <- liftIO $ FFI.getNamedFunction m name
@@ -68,33 +70,15 @@ withExecutionEngine c m createEngine f = flip runAnyContT return $ do
   liftIO initializeNativeTarget
   outExecutionEngine <- alloca
   outErrorCStringPtr <- alloca
-  Module dummyModule <- maybe (anyContToM $ liftM (either undefined id) . runExceptableT . ExceptableT
-                                   . withModuleFromAST c (A.Module "" Nothing Nothing []))
-                        (return . Module) m
-  r <- liftIO $ createEngine outExecutionEngine dummyModule outErrorCStringPtr
+  dummyModule <- maybe (anyContToM $ liftM (either undefined id) . runExceptT
+                            . withModuleFromAST c (A.Module "" "" Nothing Nothing []))
+                 (liftIO . newModule) m
+  dummyModule' <- readModule dummyModule
+  r <- liftIO $ createEngine outExecutionEngine dummyModule' outErrorCStringPtr
   when (r /= 0) $ fail =<< decodeM outErrorCStringPtr
   executionEngine <- anyContToM $ bracket (peek outExecutionEngine) FFI.disposeExecutionEngine
-  liftIO $ removeModule executionEngine dummyModule
+  liftIO $ removeModule executionEngine dummyModule'
   liftIO $ f executionEngine
-          
--- | <http://llvm.org/doxygen/classllvm_1_1JIT.html>
-newtype JIT = JIT (Ptr FFI.ExecutionEngine)
-
--- | bracket the creation and destruction of a 'JIT'
-withJIT :: 
-  Context
-  -> Word -- ^ optimization level
-  -> (JIT -> IO a)
-  -> IO a
-withJIT c opt f = FFI.linkInJIT >> withJIT' f
-  where withJIT' =
-         withExecutionEngine c Nothing (\e m -> FFI.createJITCompilerForModule e m (fromIntegral opt))
-         . (. JIT)
-
-instance ExecutionEngine JIT (FunPtr ()) where
-  withModuleInEngine (JIT e) m f = withModuleInEngine e m (\(ExecutableModule e m) -> f (ExecutableModule (JIT e) m))
-  getFunction (ExecutableModule (JIT e) m) = getFunction (ExecutableModule e m)
-      
 
 data MCJITState
   = Deferred (forall a . Module -> (Ptr FFI.ExecutionEngine -> IO a) -> IO a)
@@ -127,7 +111,8 @@ withMCJIT c opt cm fpe fisel f = do
           maybe (return ()) (FFI.setMCJITCompilerOptionsNoFramePointerElim p <=< encodeM) fpe
           maybe (return ()) (FFI.setMCJITCompilerOptionsEnableFastISel p <=< encodeM) fisel
           FFI.createMCJITCompilerForModule e m p size s
-  t <- newIORef (Deferred $ \(Module m) -> withExecutionEngine c (Just m) createMCJITCompilerForModule)
+  t <- newIORef (Deferred $ \mod f -> do m' <- readModule mod
+                                         withExecutionEngine c (Just m') createMCJITCompilerForModule f)
   f (MCJIT t)
 
 instance ExecutionEngine MCJIT (FunPtr ()) where

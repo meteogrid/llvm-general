@@ -132,7 +132,7 @@ tests = testGroup "Constants" [
       "getelementptr",
       ptr i32,
       C.GetElementPtr True (C.GlobalReference (ptr i32) (UnName 1)) [C.Int 64 27],
-      "global i32* getelementptr inbounds (i32* @1, i64 27)"
+      "global i32* getelementptr inbounds (i32, i32* @1, i64 27)"
     ), (
       "selectvalue",
       i32,
@@ -149,6 +149,11 @@ tests = testGroup "Constants" [
              (VectorType 2 i32))
          (C.Int 32 1),
       "global i32 extractelement (<2 x i32> bitcast (i64 ptrtoint (i32* @1 to i64) to <2 x i32>), i32 1)"
+    ), (
+     "addrspacecast",
+     (PointerType i32 (AddrSpace 1)),
+     C.AddrSpaceCast (C.GlobalReference (ptr i32) (UnName 1)) (PointerType i32 (AddrSpace 1)),
+     "global i32 addrspace(1)* addrspacecast (i32* @1 to i32 addrspace(1)*)"
 {-
     ), (
 --  This test made llvm abort as of llvm-3.2.  Now, as a new feature in llvm-3.4, it makes it report a fatal error!
@@ -163,7 +168,7 @@ tests = testGroup "Constants" [
 -}
     )
    ],
-   let mAST = Module "<string>" Nothing Nothing [
+   let mAST = Module "<string>" "<string>" Nothing Nothing [
              GlobalDefinition $ globalVariableDefaults {
                G.name = UnName 0, G.type' = type', G.initializer = Just value 
              },
@@ -174,7 +179,7 @@ tests = testGroup "Constants" [
                G.name = UnName 2, G.type' = i32, G.initializer = Nothing 
              }
            ]
-       mStr = "; ModuleID = '<string>'\n\n@0 = " ++ str ++ "\n\
+       mStr = "; ModuleID = '<string>'\nsource_filename = \"<string>\"\n\n@0 = " ++ str ++ "\n\
               \@1 = external global i32\n\
               \@2 = external global i32\n"
  ]
